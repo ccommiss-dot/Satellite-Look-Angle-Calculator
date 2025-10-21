@@ -1,0 +1,177 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 26,
+   "id": "12432b52-2144-4f46-ab03-05f00d401fda",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "==================================================\n",
+      "GOES-17 SATELLITE LOOK ANGLES\n",
+      "==================================================\n",
+      "Time (UTC): 2025-10-21 22:59:21\n",
+      "Observer: 33.5227°N, -117.716°W\n",
+      "--------------------------------------------------\n",
+      "Azimuth (true): 135.9°\n",
+      "Elevation: 40.6°\n",
+      "Distance: 37715.8 km\n",
+      "--------------------------------------------------\n",
+      "Azimuth (magnetic): 124.7°\n",
+      "==================================================\n"
+     ]
+    }
+   ],
+   "source": [
+    "# GOES-17 Satellite Look Angle Calculator\n",
+    "# Simple working version\n",
+    "\n",
+    "from skyfield.api import load, wgs84, EarthSatellite\n",
+    "\n",
+    "# Setup\n",
+    "ts = load.timescale()\n",
+    "t = ts.now()\n",
+    "\n",
+    "# Observer Location (Aliso Creek area)\n",
+    "observer_lat = 33.5227     # degrees North\n",
+    "observer_lon = -117.7160   # degrees West  \n",
+    "observer_elev = 0.0        # meters\n",
+    "\n",
+    "# Create observer\n",
+    "observer = wgs84.latlon(observer_lat, observer_lon, elevation_m=observer_elev)\n",
+    "\n",
+    "# GOES-17 TLE (showing satellite at ~89.5°W)\n",
+    "tle_line1 = \"1 43226U 18022A   25294.53293992 -.00000175  00000-0  00000-0 0  9998\"\n",
+    "tle_line2 = \"2 43226   0.3203  90.3134 0002898 163.6866 238.5924  1.00271005 28032\"\n",
+    "\n",
+    "# Create satellite\n",
+    "satellite = EarthSatellite(tle_line1, tle_line2, \"GOES-17\", ts)\n",
+    "\n",
+    "# Calculate look angles\n",
+    "difference = satellite - observer\n",
+    "topocentric = difference.at(t)\n",
+    "altitude, azimuth, distance = topocentric.altaz()\n",
+    "\n",
+    "# Results\n",
+    "print(\"=\" * 50)\n",
+    "print(\"GOES-17 SATELLITE LOOK ANGLES\")\n",
+    "print(\"=\" * 50)\n",
+    "print(f\"Time (UTC): {t.utc_strftime('%Y-%m-%d %H:%M:%S')}\")\n",
+    "print(f\"Observer: {observer_lat}°N, {observer_lon}°W\")\n",
+    "print(\"-\" * 50)\n",
+    "print(f\"Azimuth (true): {azimuth.degrees:.1f}°\")\n",
+    "print(f\"Elevation: {altitude.degrees:.1f}°\")\n",
+    "print(f\"Distance: {distance.km:.1f} km\")\n",
+    "print(\"-\" * 50)\n",
+    "\n",
+    "# Calculate magnetic azimuth (magnetic declination ~11.2° for this area)\n",
+    "magnetic_declination = 11.2\n",
+    "azimuth_magnetic = azimuth.degrees - magnetic_declination\n",
+    "if azimuth_magnetic < 0:\n",
+    "    azimuth_magnetic += 360\n",
+    "\n",
+    "print(f\"Azimuth (magnetic): {azimuth_magnetic:.1f}°\")\n",
+    "print(\"=\" * 50)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 27,
+   "id": "c2c17ec2-7974-4d5b-92fc-9ffa87106038",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Satellite Actual Position:\n",
+      "  Longitude: -89.5°\n",
+      "  Latitude: -0.1°\n",
+      "  Altitude: 35776.0 km\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Check where the satellite actually is\n",
+    "geocentric = satellite.at(t)\n",
+    "subpoint = wgs84.subpoint(geocentric)\n",
+    "\n",
+    "print(\"Satellite Actual Position:\")\n",
+    "print(f\"  Longitude: {subpoint.longitude.degrees:.1f}°\")\n",
+    "print(f\"  Latitude: {subpoint.latitude.degrees:.1f}°\")\n",
+    "print(f\"  Altitude: {subpoint.elevation.km:.1f} km\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 28,
+   "id": "56584cec-0c5e-4e7a-9e14-1a84940005f2",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Generic GOES satellite calculator\n",
+    "# Just update the TLE lines for any GOES satellite\n",
+    "\n",
+    "def calculate_goes_look_angles(tle_line1, tle_line2, sat_name, obs_lat, obs_lon):\n",
+    "    \"\"\"Calculate look angles for any GOES satellite\"\"\"\n",
+    "    \n",
+    "    # Create satellite and observer\n",
+    "    satellite = EarthSatellite(tle_line1, tle_line2, sat_name, ts)\n",
+    "    observer = wgs84.latlon(obs_lat, obs_lon, elevation_m=0)\n",
+    "    \n",
+    "    # Calculate\n",
+    "    difference = satellite - observer\n",
+    "    topocentric = difference.at(t)\n",
+    "    altitude, azimuth, distance = topocentric.altaz()\n",
+    "    \n",
+    "    # Get satellite position\n",
+    "    geocentric = satellite.at(t)\n",
+    "    subpoint = wgs84.subpoint(geocentric)\n",
+    "    \n",
+    "    # Print results\n",
+    "    print(f\"\\n{sat_name} Look Angles:\")\n",
+    "    print(f\"  Satellite at: {subpoint.longitude.degrees:.1f}° longitude\")\n",
+    "    print(f\"  Azimuth: {azimuth.degrees:.1f}°\")\n",
+    "    print(f\"  Elevation: {altitude.degrees:.1f}°\")\n",
+    "    print(f\"  Distance: {distance.km:.1f} km\")\n",
+    "    \n",
+    "    return azimuth.degrees, altitude.degrees, distance.km\n",
+    "\n",
+    "# Use this function for any GOES satellite\n",
+    "# Just update the TLE lines as needed"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "4bed2b58-9512-47ba-a6de-0585fd8167dd",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python [conda env:base] *",
+   "language": "python",
+   "name": "conda-base-py"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.13.5"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
